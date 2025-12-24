@@ -60,8 +60,8 @@ def get_chrome_driver():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
-def filter_by_time(results, allowed_times=['19:00', '20:00']):
-    """모니터링 시간 필터링 (19:00, 20:00만 허용)"""
+def filter_by_time(results, allowed_times=['19:00']):
+    """모니터링 시간 필터링 (19:00만 허용)"""
     filtered_results = []
     for result in results:
         time_slot = result.get('time', '')
@@ -363,11 +363,11 @@ def scrape_reservations(base_date):
         except:
             pass
         
-        # 시간 필터링 (19:00, 20:00만 허용)
+        # 시간 필터링 (19:00만 허용)
         if results:
             original_count = len(results)
             results = filter_by_time(results)
-            logger.info(f"시간 필터링: {original_count}개 → {len(results)}개 (19:00, 20:00만 표시)")
+            logger.info(f"시간 필터링: {original_count}개 → {len(results)}개 (19:00만 표시)")
         
         return results
     

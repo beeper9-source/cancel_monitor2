@@ -145,11 +145,101 @@ async function loadSavedDates() {
         const data = await response.json();
         
         if (response.ok && data.dates) {
-            displaySavedDates(data.dates);
+            if (data.dates.length > 0) {
+                displaySavedDates(data.dates);
+                // 날짜 입력 필드에 자동으로 채우기
+                fillDateInputs(data.dates);
+                alert(`저장된 날짜 ${data.dates.length}개를 불러왔습니다.`);
+            } else {
+                alert('저장된 날짜가 없습니다.');
+                const savedDatesSection = document.getElementById('saved-dates-section');
+                if (savedDatesSection) {
+                    savedDatesSection.style.display = 'none';
+                }
+            }
+        } else {
+            alert('저장된 날짜를 불러오는 중 오류가 발생했습니다.');
+            console.error('API 응답 오류:', data);
         }
     } catch (error) {
         console.error('Error:', error);
+        alert('저장된 날짜를 불러오는 중 오류가 발생했습니다: ' + error.message);
     }
+}
+
+// 날짜 입력 필드에 저장된 날짜 채우기
+function fillDateInputs(dates) {
+    const dateInputsContainer = document.querySelector('.date-inputs');
+    if (!dateInputsContainer) return;
+    
+    // 기존 입력 필드 초기화 (첫 번째는 유지)
+    const existingInputs = document.querySelectorAll('.date-picker');
+    const firstInput = existingInputs[0];
+    
+    // 첫 번째 입력 필드 제외한 나머지 제거
+    existingInputs.forEach((input, index) => {
+        if (index > 0) {
+            const dateItem = input.closest('.date-item');
+            if (dateItem) {
+                dateItem.remove();
+            }
+        }
+    });
+    
+    // 날짜 형식 변환 및 입력 필드에 채우기
+    dates.forEach((date, index) => {
+        // 날짜 형식 변환 (YYYY-MM-DD 형식으로)
+        let formattedDate = date;
+        if (date.length === 8 && date.indexOf('-') === -1) {
+            // YYYYMMDD -> YYYY-MM-DD
+            formattedDate = `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+        }
+        
+        if (index === 0) {
+            // 첫 번째 입력 필드에 채우기
+            if (firstInput) {
+                firstInput.value = formattedDate;
+                const dateItem = firstInput.closest('.date-item');
+                if (dateItem) {
+                    const removeBtn = dateItem.querySelector('.remove-date');
+                    const saveBtn = dateItem.querySelector('.save-date-btn');
+                    if (removeBtn) removeBtn.style.display = 'inline-block';
+                    if (saveBtn) saveBtn.style.display = 'inline-block';
+                }
+            }
+        } else {
+            // 추가 입력 필드 생성
+            const newDateItem = document.createElement('div');
+            newDateItem.className = 'date-item';
+            newDateItem.innerHTML = `
+                <input type="date" class="date-picker" data-index="${index}" value="${formattedDate}">
+                <button class="remove-date" data-index="${index}">삭제</button>
+                <button class="save-date-btn" data-index="${index}">저장</button>
+            `;
+            dateInputsContainer.appendChild(newDateItem);
+            
+            // 삭제 버튼 이벤트
+            const removeBtn = newDateItem.querySelector('.remove-date');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function() {
+                    newDateItem.remove();
+                });
+            }
+            
+            // 저장 버튼 이벤트
+            const saveBtn = newDateItem.querySelector('.save-date-btn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    const dateValue = newDateItem.querySelector('.date-picker').value;
+                    if (dateValue) {
+                        saveDate(dateValue);
+                    } else {
+                        alert('날짜를 선택해주세요.');
+                    }
+                });
+            }
+        }
+    });
 }
 
 // 저장된 날짜 표시
