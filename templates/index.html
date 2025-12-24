@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>일자별 예약현황 모니터링</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>일자별 예약현황 모니터링</h1>
+        
+        <div class="date-selection">
+            <h2>모니터링 날짜 선택 (최대 5개)</h2>
+            <div class="date-inputs">
+                <div class="date-item">
+                    <input type="date" class="date-picker" data-index="0">
+                    <button class="remove-date" data-index="0" style="display: none;">삭제</button>
+                    <button class="save-date-btn" data-index="0" style="display: none;">저장</button>
+                </div>
+            </div>
+            <div class="button-group">
+                <button id="add-date-btn" class="btn btn-secondary">날짜 추가</button>
+                <button id="monitor-btn" class="btn btn-primary">모니터링 시작</button>
+                <button id="load-saved-dates-btn" class="btn btn-secondary">저장된 날짜 불러오기</button>
+            </div>
+            
+            <div class="saved-dates-section" id="saved-dates-section" style="display: none;">
+                <h3>저장된 날짜 목록</h3>
+                <div class="saved-dates-list" id="saved-dates-list">
+                    <!-- 저장된 날짜 목록이 여기에 표시됩니다 -->
+                </div>
+            </div>
+        </div>
+
+        <div class="results-section" id="results-section" style="display: none;">
+            <h2>예약현황 결과</h2>
+            <div class="results-container" id="results-container">
+                <!-- 결과가 여기에 표시됩니다 -->
+            </div>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>모니터링 중...</p>
+        </div>
+
+        <div class="email-receivers-section">
+            <h2>이메일 수신자 관리</h2>
+            <div class="receiver-input-group">
+                <input type="email" id="receiver-email-input" placeholder="이메일 주소 입력" style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 16px;">
+                <button id="add-receiver-btn" class="btn btn-primary">추가</button>
+            </div>
+            <div class="saved-receivers-section" id="saved-receivers-section" style="display: none; margin-top: 20px;">
+                <h3>수신자 목록</h3>
+                <div class="saved-receivers-list" id="saved-receivers-list">
+                    <!-- 수신자 목록이 여기에 표시됩니다 -->
+                </div>
+            </div>
+        </div>
+
+        <div class="auto-monitoring-section">
+            <h2>자동 모니터링 설정</h2>
+            <div class="schedule-form">
+                <div class="form-group">
+                    <label>시작시간 (HH:MM)</label>
+                    <input type="time" id="start-time-input" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>종료시간 (HH:MM)</label>
+                    <input type="time" id="end-time-input" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>주기 (분)</label>
+                    <input type="number" id="interval-input" class="form-input" min="1" value="60" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="schedule-enabled" checked> 활성화
+                    </label>
+                </div>
+                <div class="button-group">
+                    <button id="save-schedule-btn" class="btn btn-primary">스케줄 저장</button>
+                    <button id="load-schedule-btn" class="btn btn-secondary">스케줄 불러오기</button>
+                </div>
+                <div id="schedule-status" style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 5px; display: none;"></div>
+            </div>
+        </div>
+
+        <div class="email-test-section">
+            <h2>이메일 발송 테스트</h2>
+            <div class="button-group">
+                <button id="test-email-smtp-btn" class="btn btn-primary">SMTP 이메일 발송 테스트</button>
+                <button id="test-email-edge-btn" class="btn btn-secondary">Edge Function 이메일 테스트</button>
+            </div>
+            <div id="email-result" style="display: none; margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 5px;"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
