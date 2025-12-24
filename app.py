@@ -14,8 +14,6 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import threading
-from threading import Thread
 
 app = Flask(__name__)
 CORS(app)
@@ -25,7 +23,6 @@ DATA_DIR = 'data'
 JSON_FILE = os.path.join(DATA_DIR, 'reservations.json')
 DATES_FILE = os.path.join(DATA_DIR, 'monitoring_dates.json')
 RECEIVERS_FILE = os.path.join(DATA_DIR, 'email_receivers.json')
-SCHEDULE_FILE = os.path.join(DATA_DIR, 'monitoring_schedule.json')
 
 # data 디렉토리 생성
 if not os.path.exists(DATA_DIR):
@@ -63,8 +60,8 @@ def get_chrome_driver():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
-def filter_by_time(results, allowed_times=['19:00', '20:00', '21:00']):
-    """모니터링 시간 필터링 (19:00, 20:00, 21:00만 허용)"""
+def filter_by_time(results, allowed_times=['19:00', '20:00']):
+    """모니터링 시간 필터링 (19:00, 20:00만 허용)"""
     filtered_results = []
     for result in results:
         time_slot = result.get('time', '')
@@ -366,11 +363,11 @@ def scrape_reservations(base_date):
         except:
             pass
         
-        # 시간 필터링 (19:00, 20:00, 21:00만 허용)
+        # 시간 필터링 (19:00, 20:00만 허용)
         if results:
             original_count = len(results)
             results = filter_by_time(results)
-            logger.info(f"시간 필터링: {original_count}개 → {len(results)}개 (19:00, 20:00, 21:00만 표시)")
+            logger.info(f"시간 필터링: {original_count}개 → {len(results)}개 (19:00, 20:00만 표시)")
         
         return results
     
@@ -529,130 +526,6 @@ def delete_email_receiver(email):
         receivers.remove(email)
         return save_email_receivers(receivers)
     return True
-
-def load_monitoring_schedule():
-    """모니터링 스케줄 로드"""
-    if not os.path.exists(SCHEDULE_FILE):
-        return None
-    
-    try:
-        with open(SCHEDULE_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data if isinstance(data, dict) else None
-    except Exception as e:
-        logger.error(f"모니터링 스케줄 파일 읽기 오류: {e}")
-        return None
-
-def save_monitoring_schedule(schedule):
-    """모니터링 스케줄 저장"""
-    try:
-        with open(SCHEDULE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(schedule, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        logger.error(f"모니터링 스케줄 파일 저장 오류: {e}")
-        return False
-
-# 자동 모니터링 스레드 관련 변수
-monitoring_thread = None
-monitoring_active = False
-
-def run_scheduled_monitoring():
-    """스케줄에 따라 모니터링 실행"""
-    global monitoring_active
-    
-    while monitoring_active:
-        try:
-            schedule = load_monitoring_schedule()
-            if not schedule or not schedule.get('enabled', False):
-                time.sleep(60)  # 1분마다 체크
-                continue
-            
-            start_time = schedule.get('start_time', '00:00')
-            end_time = schedule.get('end_time', '23:59')
-            interval_minutes = schedule.get('interval_minutes', 60)
-            
-            current_time = datetime.now().strftime('%H:%M')
-            
-            # 현재 시간이 시작시간과 종료시간 사이인지 확인
-            if start_time <= current_time <= end_time:
-                logger.info(f"자동 모니터링 실행: {current_time}")
-                
-                # 저장된 날짜 목록으로 모니터링 실행
-                saved_dates = load_monitoring_dates()
-                if saved_dates:
-                    # 모니터링 실행 (동기적으로)
-                    try:
-                        dates = saved_dates[:5]  # 최대 5개
-                        all_results = []
-                        
-                        for date in dates:
-                            if isinstance(date, str) and '-' in date:
-                                date = date.replace('-', '')
-                            
-                            logger.info(f"자동 스크래핑 시작: {date}")
-                            results = scrape_reservations(date)
-                            all_results.extend(results)
-                            save_to_json(results)
-                            time.sleep(2)
-                        
-                        # 예약가능한 항목이 있으면 이메일 발송
-                        available_reservations = check_available_reservations(all_results)
-                        if available_reservations:
-                            send_availability_email(available_reservations)
-                        
-                        logger.info(f"자동 모니터링 완료: {len(all_results)}개 결과")
-                    except Exception as e:
-                        logger.error(f"자동 모니터링 실행 오류: {e}", exc_info=True)
-                else:
-                    logger.warning("저장된 날짜가 없어 자동 모니터링을 건너뜁니다.")
-                
-                # 다음 실행까지 대기 (주기 설정)
-                wait_seconds = interval_minutes * 60
-                
-                # 다음 실행 시간이 종료시간을 넘지 않도록 확인
-                next_time = (datetime.now().timestamp() + wait_seconds)
-                next_time_str = datetime.fromtimestamp(next_time).strftime('%H:%M')
-                
-                if next_time_str > end_time:
-                    # 다음 실행 시간이 종료시간을 넘으면, 다음 날 시작시간까지 대기
-                    logger.info(f"종료시간({end_time})을 넘어서 다음 날 시작시간({start_time})까지 대기합니다.")
-                    # 다음 날 시작시간까지의 시간 계산
-                    now = datetime.now()
-                    start_hour, start_min = map(int, start_time.split(':'))
-                    next_start = now.replace(hour=start_hour, minute=start_min, second=0, microsecond=0)
-                    if next_start <= now:
-                        next_start = next_start.replace(day=next_start.day + 1)
-                    wait_seconds = (next_start - now).total_seconds()
-                
-                time.sleep(wait_seconds)
-            else:
-                # 시작시간과 종료시간 사이가 아니면 1분마다 체크
-                time.sleep(60)
-            
-        except Exception as e:
-            logger.error(f"자동 모니터링 스레드 오류: {e}", exc_info=True)
-            time.sleep(60)
-
-def start_monitoring_thread():
-    """모니터링 스레드 시작"""
-    global monitoring_thread, monitoring_active
-    
-    if monitoring_thread and monitoring_thread.is_alive():
-        logger.info("모니터링 스레드가 이미 실행 중입니다.")
-        return
-    
-    monitoring_active = True
-    monitoring_thread = Thread(target=run_scheduled_monitoring, daemon=True)
-    monitoring_thread.start()
-    logger.info("자동 모니터링 스레드 시작됨")
-
-def stop_monitoring_thread():
-    """모니터링 스레드 중지"""
-    global monitoring_active
-    
-    monitoring_active = False
-    logger.info("자동 모니터링 스레드 중지 요청됨")
 
 @app.route('/')
 def index():
@@ -1107,78 +980,6 @@ def send_email_edge():
             'error': f'Edge Function 호출 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
-@app.route('/api/monitoring-schedule', methods=['GET'])
-def get_monitoring_schedule():
-    """모니터링 스케줄 조회"""
-    schedule = load_monitoring_schedule()
-    return jsonify({'schedule': schedule})
-
-@app.route('/api/monitoring-schedule', methods=['POST'])
-def save_monitoring_schedule_api():
-    """모니터링 스케줄 저장"""
-    try:
-        data = request.json
-        start_time = data.get('start_time')
-        end_time = data.get('end_time')
-        interval_minutes = data.get('interval_minutes')
-        enabled = data.get('enabled', True)
-        
-        if not start_time or not end_time or not interval_minutes:
-            return jsonify({'error': '시작시간, 종료시간, 주기는 필수입니다.'}), 400
-        
-        # 시간 형식 검증 (HH:MM)
-        if not re.match(r'^\d{2}:\d{2}$', start_time) or not re.match(r'^\d{2}:\d{2}$', end_time):
-            return jsonify({'error': '시간 형식이 올바르지 않습니다. (HH:MM 형식)'}), 400
-        
-        # 주기 검증 (1분 이상)
-        if interval_minutes < 1:
-            return jsonify({'error': '주기는 1분 이상이어야 합니다.'}), 400
-        
-        schedule = {
-            'start_time': start_time,
-            'end_time': end_time,
-            'interval_minutes': interval_minutes,
-            'enabled': enabled,
-            'updated_at': datetime.now().isoformat()
-        }
-        
-        if save_monitoring_schedule(schedule):
-            # 스케줄이 활성화되어 있으면 스레드 재시작
-            if enabled:
-                stop_monitoring_thread()
-                time.sleep(1)
-                start_monitoring_thread()
-            else:
-                stop_monitoring_thread()
-            
-            return jsonify({'success': True, 'message': '스케줄이 저장되었습니다.', 'schedule': schedule})
-        else:
-            return jsonify({'error': '스케줄 저장에 실패했습니다.'}), 500
-            
-    except Exception as e:
-        logger.error(f"스케줄 저장 오류: {e}")
-        return jsonify({'error': f'스케줄 저장 중 오류가 발생했습니다: {str(e)}'}), 500
-
-@app.route('/api/monitoring-schedule/status', methods=['GET'])
-def get_monitoring_schedule_status():
-    """모니터링 스케줄 실행 상태 조회"""
-    global monitoring_thread, monitoring_active
-    
-    schedule = load_monitoring_schedule()
-    is_running = monitoring_thread is not None and monitoring_thread.is_alive() and monitoring_active
-    
-    return jsonify({
-        'schedule': schedule,
-        'is_running': is_running,
-        'thread_alive': monitoring_thread.is_alive() if monitoring_thread else False
-    })
-
 if __name__ == '__main__':
-    # 서버 시작 시 자동 모니터링 스레드 시작
-    schedule = load_monitoring_schedule()
-    if schedule and schedule.get('enabled', False):
-        start_monitoring_thread()
-        logger.info("자동 모니터링 스케줄이 활성화되어 있습니다.")
-    
     app.run(debug=True, host='0.0.0.0', port=5000)
 
