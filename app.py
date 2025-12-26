@@ -547,9 +547,9 @@ def monitor():
         else:
             return jsonify({'error': '날짜가 필요합니다. 저장된 날짜가 없습니다.'}), 400
     
-    if len(dates) > 5:
-        dates = dates[:5]  # 최대 5개까지만 사용
-        logger.warning(f"날짜가 5개를 초과하여 처음 5개만 사용합니다.")
+    if len(dates) > 10:
+        dates = dates[:10]  # 최대 10개까지만 사용
+        logger.warning(f"날짜가 10개를 초과하여 처음 10개만 사용합니다.")
     
     all_results = []
     
